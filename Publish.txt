@@ -1,0 +1,69 @@
+import time
+import random
+from paho.mqtt import client as mqtt_client
+
+# ==========================================
+# [CONFIG] ตั้งค่าให้ตรงกับ Raspberry Pi
+# ==========================================
+broker = '_____________'  # <--- เช็ค IP Broker ให้ถูกต้อง (ปกติขึ้นต้น 192)
+port = _______
+topic = "_______________" # <--- ต้องตรงกับ Topic ใน Raspberry Pi
+client_id = f'commander-{random.randint(0, 1000)}'
+
+def connect_mqtt():
+    # ใช้ VERSION1 เพื่อความง่าย (on_connect รับ 4 arguments)
+    def on_connect(client, userdata, flags, rc):
+        if rc == 0:
+            print(f"Connected to MQTT Broker at {broker}!")
+        else:
+            print(f"Failed to connect, return code {rc}")
+
+    client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION1, client_id)
+    client.on_connect = on_connect
+    try:
+        client.connect(broker, port, 60)
+    except Exception as e:
+        print(f"Connection Error: {e}")
+    return client
+
+def run():
+    client = connect_mqtt()
+    client.loop_start() # เริ่มทำงาน Background เพื่อรักษาการเชื่อมต่อ
+    
+    time.sleep(1) # รอเชื่อมต่อสักนิด
+    
+    print("="*40)
+    print(" MQTT COMMANDER STARTED")
+    print(" Type color: 'red', 'blue', 'green', 'orange'")
+    print(" Type 'exit' to quit")
+    print("="*40)
+
+    try:
+        while True:
+            # รับค่าจากคีย์บอร์ด
+            user_input = input("Enter Command: ").strip()
+            
+            if user_input.lower() == 'exit':
+                break
+            
+            # ส่งคำสั่ง (เช่น "Detect red")
+            msg_command = f"Detect {user_input}"
+            result = client.publish(topic, msg_command)
+            
+            status = result[0]
+            if status == 0:
+                print(f" [Sent] '{msg_command}' -> Topic: '{topic}'")
+            else:
+                print(f" [Failed] Could not send message")
+            
+            time.sleep(0.5)
+
+    except KeyboardInterrupt:
+        print("\nExiting...")
+    finally:
+        client.loop_stop()
+        client.disconnect()
+        print("Disconnected.")
+
+if __name__ == '__main__':
+    run()
